@@ -1,17 +1,19 @@
 /**
  * @author Toni Schmidt
- *
+ * SHA-256 implementation as per the NIST spec: http://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf
+ * All section references in below comments refer to the NIST spec
  */
 
 package org.toni.crypto.hashing;
 
+import java.nio.ByteBuffer;
 
 public class Sha256 {
 	
-	
-	
-	
+// Section 5.5.3
 	private static final int[] H = { 0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19 };
+	
+// Section 4.2.2
 	private static final int[] K = { 0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
 		                             0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
 		                             0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
@@ -20,28 +22,90 @@ public class Sha256 {
 		                             0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
 		                             0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
 		                             0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2 };
-    private static int [] words = new int[64];
-    
-    
-	private Sha256() {
-		
+// Re-used int array
+	private static int [] words = new int[64];
+   
+	private Sha256() {		
 	}
 	
+
 	public static Sha256 getInstance() {
 		return new Sha256();
-	}
-	
-	
-	private int Ch(int x, int y, int z) {
-		int ret = (x & y) ^ (~x & z );
-		return ret;
-	}
-	
-	private int Maj(int x, int y, int z) {
-		int ret = (x & y) ^ (x & z ) ^ (y & z );
-		return ret;
 	}	
+
+	/** 
+	 * Sample:
+	 * x: 1101 1101
+	 * y: 1011 0011
+	 * z: 1101 0011
+	 * 
+	 *   x & y:
+	 *   1101 1101
+	 * & 1011 0011
+	 * = 1001 0001
+	 * 
+	 * 	 ~x & z
+	 *   0010 0010
+	 * & 1101 0011
+	 * = 0000 0010
+	 * 
+	 *   (x & y) ^ (~x & z )
+	 *   1001 0001
+	 * ^ 0000 0010
+	 * = 1001 0011
+	 *      
+	 * @return 
+	 */
+	private int Ch(int x, int y, int z) {
+		return (x & y) ^ (~x & z);		 
+	}
 	
+	
+	/**
+	 * x: 1101 1101
+	 * y: 1011 0011
+	 * z: 1101 0011 
+	 *  
+	 *   x & y:
+	 *   1101 1101
+	 * & 1011 0011
+	 * = 1001 0001 
+	 *  
+	 *   x & z:
+	 *   1101 1101
+	 * & 1101 0011 
+	 * = 1101 0001
+	 * 
+	 *   y & z:
+	 *   1011 0011
+	 * & 1101 0011 
+	 * = 1001 0011   
+	 * 
+	 *   (x & y) ^ (x & z ) ^ (y & z )
+	 *   1001 0001
+	 * ^ 1101 0001
+	 * ^ 1001 0011
+	 * = 1101 0011 
+	 */	
+	private int Maj(int x, int y, int z) {
+		return (x & y) ^ (x & z ) ^ (y & z );
+	}	
+
+	/**
+	 * 
+	 * Sample for ROTR(2, 124)
+	 * n: 2
+	 * x: 		0000 0000 0000 0000 0000 0000 ‭0111 1101‬
+	 * 
+	 *   x >>> n ...  Operator ">>>" in Java is an unsigned right shift... so the value will always be filled with zeros from the left      ‬
+	 * x >> 2:  0000 0000 0000 0000 0000 0000‭ ‭0001 1111 
+	 * 
+	 *   (x << (32-n)
+	 * x << 30: 0100 0000 0000 0000 0000 0000 0000 0000
+	 * 
+	 * 	 (x >>> n) | (x << (32-n))
+	 * 			0100 0000 0000 0000 0000 0000 0001 1111
+	 */
     private int ROTR(int n, int x) {
         return (x >>> n) | (x << (32-n));
     }	
@@ -78,57 +142,55 @@ public class Sha256 {
 		return ret;
     }   
     
+    
     private byte[] intToBytes(int i) {
-        byte[] b = new byte[4];
-        for (int c = 0; c < 4; c++) {
-            b[c] = (byte) ((i >>> (56 - 8 * c)) & 0xff);
-        }
-        return b;
+    	return ByteBuffer.allocate(4).putInt(i).array();
     }    
     
-    static int makeInt(byte b3, byte b2, byte b1, byte b0) {
+    private int bytesToInt(byte b3, byte b2, byte b1, byte b0) {
         return (((b3       ) << 24) |
                 ((b2 & 0xff) << 16) |
                 ((b1 & 0xff) <<  8) |
                 ((b0 & 0xff)      ));
     }    
 
-
-    private void fillWord(int wordIndex, byte[] block) {		
+/**
+ * Prepares the message schedule as per section 6.2.2
+ * @param wordIndex
+ * @param block
+ */
+    private void fillWords(int wordIndex, byte[] block) {    	
     	if (wordIndex < 16) {		// for 0 <= t <= 15 	
-			int wordStartIndex = wordIndex * 4;
+			int wordStartIndex = wordIndex * 4;	// wordIndex * 4 since each word occupies four byte
 			byte b3 = block[wordStartIndex];
 			byte b2 = block[wordStartIndex + 1];
 			byte b1 = block[wordStartIndex + 2];
 			byte b0 = block[wordStartIndex + 3];
-			int word = makeInt(b3, b2, b1, b0);	
-			words[wordIndex] = word; 
-		} else {					// for 16 <= t <= 63			
+			int word = bytesToInt(b3, b2, b1, b0);	// convert byte[] to int
+			words[wordIndex] = word; 				// remember for future usage
+		} else {					// for 16 <= t <= 63 ... lots of bitwise mixing			
 			int f1 = Sigma1(words[wordIndex - 2]);
 			int f2 = words[wordIndex - 7];
 			int f3 = Sigma0(words[wordIndex - 15]);
 			int f4 = words[wordIndex - 16];
-			words[wordIndex] = (f1 + f2 + f3 + f4)  >>> 0;   			
+			words[wordIndex] = f1 + f2 + f3 + f4;			
 		}
     }
     
     public byte [] digest( byte[] msg) {
     	byte[] paddedMsg = padMsg(msg);
-    	byte[] hash = parseMsg(paddedMsg);
-    	return hash;
+    	byte[] messageDigest = digestMsg(paddedMsg);
+    	return messageDigest;
     }
     
-    private byte[] parseMsg( byte[] paddedMsg) {
+    private byte[] digestMsg( byte[] paddedMsg) {
     	int paddedMsgLen = paddedMsg.length;
     	int numBlocks = paddedMsgLen / 64;
     	byte [][] blockArr = new byte [numBlocks][64];  // each block contains sixteen 32-bit words == 64 byte
     	
-    	// fill message schedule
+    	// fill message blocks
     	for (int i = 0; i < paddedMsgLen / 64; i++) {
-    		//for(int j = 0; j < 64; j++) {
 			System.arraycopy(paddedMsg, i * 64, blockArr[i], 0, 64);
-    			//blockArr[i][j] = paddedMsg[i * j + j];
-    		//}   
     	}    	
     	
     	int a, b, c, d, e, f, g, h;
@@ -138,7 +200,7 @@ public class Sha256 {
     	for (int i = 0; i < numBlocks; i++) {
     		// 1. Prepare message schedule
     		for(int j = 0; j < 64; j++) {
-    			fillWord(j, blockArr[i]);
+    			fillWords(j, blockArr[i]);
     		}   
 
     		a = hashValues[0];
@@ -162,6 +224,7 @@ public class Sha256 {
     			b = a;
     			a = (T1 + T2)  >>> 0;    				
     		}
+    		
     		hashValues[0] = (a + hashValues[0])  >>> 0;
     		hashValues[1] = (b + hashValues[1])  >>> 0;
     		hashValues[2] = (c + hashValues[2])  >>> 0;
