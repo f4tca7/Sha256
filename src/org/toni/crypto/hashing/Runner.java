@@ -1,3 +1,8 @@
+/**
+ * @author Toni Schmidt
+ *
+ */
+
 package org.toni.crypto.hashing;
 import javax.xml.bind.DatatypeConverter;
 
