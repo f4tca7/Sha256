@@ -154,55 +154,47 @@ public class Sha256 {
                 ((b0 & 0xff)      ));
     }    
 
-/**
- * Prepares the message schedule as per section 6.2.2
- * @param wordIndex
- * @param block
- */
-    private void fillWords(int wordIndex, byte[] block) {    	
-    	if (wordIndex < 16) {		// for 0 <= t <= 15 	
-			int wordStartIndex = wordIndex * 4;	// wordIndex * 4 since each word occupies four byte
-			byte b3 = block[wordStartIndex];
-			byte b2 = block[wordStartIndex + 1];
-			byte b1 = block[wordStartIndex + 2];
-			byte b0 = block[wordStartIndex + 3];
-			int word = bytesToInt(b3, b2, b1, b0);	// convert byte[] to int
-			words[wordIndex] = word; 				// remember for future usage
-		} else {					// for 16 <= t <= 63 ... lots of bitwise mixing			
-			int f1 = Sigma1(words[wordIndex - 2]);
-			int f2 = words[wordIndex - 7];
-			int f3 = Sigma0(words[wordIndex - 15]);
-			int f4 = words[wordIndex - 16];
-			words[wordIndex] = f1 + f2 + f3 + f4;			
-		}
-    }
-    
-    public byte [] digest( byte[] msg) {
+
+
+    /**
+     * Main digest method
+     * @param msg The message input
+     * @return The hash digest
+     */
+    public byte [] digest(byte[] msg) {
+    	// 1. Pad message
     	byte[] paddedMsg = padMsg(msg);
-    	byte[] messageDigest = digestMsg(paddedMsg);
+    	// 2. Parse message
+    	byte[][] parsedMsg = parseMsg(paddedMsg);
+    	// 3. Hash computation
+    	byte[] messageDigest = digestMsg(parsedMsg);
     	return messageDigest;
     }
     
-    private byte[] digestMsg( byte[] paddedMsg) {
-    	int paddedMsgLen = paddedMsg.length;
-    	int numBlocks = paddedMsgLen / 64;
-    	byte [][] blockArr = new byte [numBlocks][64];  // each block contains sixteen 32-bit words == 64 byte
-    	
-    	// fill message blocks
-    	for (int i = 0; i < paddedMsgLen / 64; i++) {
-			System.arraycopy(paddedMsg, i * 64, blockArr[i], 0, 64);
-    	}    	
+
+    /**
+     * Computes the hash digest as per section 6.2.2
+     * 1) Initialize the message schedule, consisting of 64 words (each 32 bit)
+     * 2) Initialize working variables a ... h with the hash values of the previous iteration
+     * 3) Compute the working variable for the current iteration
+     * 4) Update the hash value of the current iteration
+     * @param parsedMsg The parsed message, consisting of 512-bit blocks
+     * @return The hash digest
+     */
+    private byte[] digestMsg(byte[][] parsedMsg) {
     	
     	int a, b, c, d, e, f, g, h;
     	int[] hashValues = new int[8];
+    	
+    	// Initialize hash values for the first iteration, as per section 5.3.3
     	System.arraycopy(H, 0, hashValues, 0, 8);
     	
-    	for (int i = 0; i < numBlocks; i++) {
+    	// Iterate through the input message blocks
+    	for (int i = 0; i < parsedMsg.length; i++) {
     		// 1. Prepare message schedule
-    		for(int j = 0; j < 64; j++) {
-    			fillWords(j, blockArr[i]);
-    		}   
-
+    		fillWords(parsedMsg[i]);
+    		
+    		// 2. Initialize working variables with hash values of previous iteration
     		a = hashValues[0];
     		b = hashValues[1];
     		c = hashValues[2];
@@ -212,37 +204,94 @@ public class Sha256 {
     		g = hashValues[6];
     		h = hashValues[7];
     		
+    		// 3. Compute updated working variables
     		for (int t = 0; t < 64; t++) {
-    			int T1 = (h + Sum1(e) + Ch(e, f, g) + K[t] + words[t])  >>> 0;
-    			int T2 = (Sum0(a) + Maj(a, b, c))  >>> 0;
+    			int T1 = h + Sum1(e) + Ch(e, f, g) + K[t] + words[t];
+    			int T2 = Sum0(a) + Maj(a, b, c);
     			h = g;
     			g = f;
     			f = e;
-    			e = (d + T1)  >>> 0;
+    			e = d + T1;
     			d = c;
     			c = b;
     			b = a;
-    			a = (T1 + T2)  >>> 0;    				
+    			a = T1 + T2;    				
     		}
     		
-    		hashValues[0] = (a + hashValues[0])  >>> 0;
-    		hashValues[1] = (b + hashValues[1])  >>> 0;
-    		hashValues[2] = (c + hashValues[2])  >>> 0;
-    		hashValues[3] = (d + hashValues[3])  >>> 0;
-    		hashValues[4] = (e + hashValues[4])  >>> 0;
-    		hashValues[5] = (f + hashValues[5])  >>> 0;
-    		hashValues[6] = (g + hashValues[6])  >>> 0;
-    		hashValues[7] = (h + hashValues[7])  >>> 0;
-    	}
+    		// 4. Update hash values
+    		hashValues[0] = a + hashValues[0];
+    		hashValues[1] = b + hashValues[1];
+    		hashValues[2] = c + hashValues[2];
+    		hashValues[3] = d + hashValues[3];
+    		hashValues[4] = e + hashValues[4];
+    		hashValues[5] = f + hashValues[5];
+    		hashValues[6] = g + hashValues[6];
+    		hashValues[7] = h + hashValues[7];
+    	}    	
     	
-        byte[] hash = new byte[32];    	
+        byte[] digest = new byte[32]; 
+        // Concatenate the hash values to one 256-bit output byte[]
         for (int i = 0; i < 8; i++) {
-            System.arraycopy(intToBytes(hashValues[i]), 0, hash, 4 * i, 4);
+            System.arraycopy(intToBytes(hashValues[i]), 0, digest, 4 * i, 4);
         }    	
     	
-    	return hash;
+    	return digest;
     }
     
+	/**
+	 * Prepares the message schedule as per section 6.2.2
+	 * @param block One 512-bit input block
+	 */
+    private void fillWords(byte[] block) {   
+		for(int t = 0; t < 64; t++) {
+	    	if (t < 16) {		// for 0 <= t <= 15 	
+				int wordStartIndex = t * 4;	// wordIndex * 4 since each word occupies four byte
+				byte b3 = block[wordStartIndex];
+				byte b2 = block[wordStartIndex + 1];
+				byte b1 = block[wordStartIndex + 2];
+				byte b0 = block[wordStartIndex + 3];
+				int word = bytesToInt(b3, b2, b1, b0);	// convert byte[] to int
+				words[t] = word; 				// remember for future usage
+			} else {					// for 16 <= t <= 63 ... lots of bitwise mixing			
+				int f1 = Sigma1(words[t - 2]);
+				int f2 = words[t - 7];
+				int f3 = Sigma0(words[t - 15]);
+				int f4 = words[t - 16];
+				words[t] = f1 + f2 + f3 + f4;			
+			}
+		}
+    }
+    
+    /**
+     * As per section 5.2.1
+     * Parses the padded:
+     * The message is split into blocks of 512-bit/64-byte length.
+     * Each of those blocks will serve as input for one iteration in the hash computation
+     * @param paddedMsg the padded input message
+     * @return A two-dimensional array byte[block][message]
+     */
+    private byte [][] parseMsg(byte[] paddedMsg) {
+    	int paddedMsgLen = paddedMsg.length;
+    	int numBlocks = paddedMsgLen / 64;
+    	byte [][] blocks = new byte [numBlocks][64];  // each block contains sixteen 32-bit words == 64 byte
+    	
+    	// fill message blocks
+    	for (int i = 0; i < paddedMsgLen / 64; i++) {
+			System.arraycopy(paddedMsg, i * 64, blocks[i], 0, 64);
+    	}   	
+    	return blocks;
+    }
+    
+    /**
+     * As per section 5.1.1
+     * Adds a padding to the input message, so that:
+     * 1) The overall message length in bits is divisible by 512 (because it will be separated into 512-bit blocks in the next stage)
+     * 2) The bit immediately after the message is 1
+     * 3) The bits following are 0
+     * 4) The last 64 bits are the input message length
+     * @param msg The input message
+     * @return Padded message
+     */
     private byte[] padMsg(byte[] msg) {
     	int messageLength = msg.length;
     	int overflow = messageLength % 64; // overflow bytes are not in a 64-byte/512-bit block 
