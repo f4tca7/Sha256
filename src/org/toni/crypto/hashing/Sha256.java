@@ -34,37 +34,43 @@ public class Sha256 {
 	}	
 
 	/** 
+	 * Ch (for "Choose"). If bit n in x == 1: bit n in result is the same as bit n of input y. else, take bit n of input z
 	 * Sample:
-	 * x: 1101 1101
-	 * y: 1011 0011
-	 * z: 1101 0011
+	 * x: 1111 0000
+	 * y: 0000 0000
+	 * z: 1111 1111
+	 * ------------
+	 * -> 0000 1111
 	 * 
 	 *   x & y:
-	 *   1101 1101
-	 * & 1011 0011
-	 * = 1001 0001
+	 *   1111 0000
+	 * & 0000 0000
+	 * = 0000 0000
 	 * 
 	 * 	 ~x & z
-	 *   0010 0010
-	 * & 1101 0011
-	 * = 0000 0010
+	 *   0000 1111
+	 * & 1111 1111
+	 * = 0000 1111
 	 * 
 	 *   (x & y) ^ (~x & z )
-	 *   1001 0001
-	 * ^ 0000 0010
-	 * = 1001 0011
+	 *   0000 0000
+	 * ^ 0000 1111
+	 * = 0000 1111
 	 *      
 	 * @return 
 	 */
-	private int Ch(int x, int y, int z) {
+	public int Ch(int x, int y, int z) {
 		return (x & y) ^ (~x & z);		 
 	}
 	
 	
 	/**
+	 * Maj (for "Majority). If min. 2 of 3 bits at position n in inputs x, y, z are 1: Bit n in result is 1. Otherwise 0.
 	 * x: 1101 1101
 	 * y: 1011 0011
-	 * z: 1101 0011 
+	 * z: 1101 0011
+	 * ------------ 
+	 * -> 1101 0011
 	 *  
 	 *   x & y:
 	 *   1101 1101
@@ -87,12 +93,12 @@ public class Sha256 {
 	 * ^ 1001 0011
 	 * = 1101 0011 
 	 */	
-	private int Maj(int x, int y, int z) {
+	public int Maj(int x, int y, int z) {
 		return (x & y) ^ (x & z ) ^ (y & z );
 	}	
 
 	/**
-	 * 
+	 * Rotate Right, meaning a right shift where the overflow to the right is added to the left
 	 * Sample for ROTR(2, 124)
 	 * n: 2
 	 * x: 		0000 0000 0000 0000 0000 0000 ‭0111 1101‬
@@ -153,8 +159,6 @@ public class Sha256 {
                 ((b1 & 0xff) <<  8) |
                 ((b0 & 0xff)      ));
     }    
-
-
 
     /**
      * Main digest method
