@@ -35,7 +35,7 @@ public class Sha256 {
 
 	/** 
 	 * Ch (for "Choose"). If bit n in x == 1: bit n in result is the same as bit n of input y. else, take bit n of input z
-	 * Sample:
+	 *  
 	 * x: 1111 0000
 	 * y: 0000 0000
 	 * z: 1111 1111
@@ -59,13 +59,14 @@ public class Sha256 {
 	 *      
 	 * @return 
 	 */
-	public int Ch(int x, int y, int z) {
+	private int Ch(int x, int y, int z) {
 		return (x & y) ^ (~x & z);		 
 	}
 	
 	
 	/**
-	 * Maj (for "Majority). If min. 2 of 3 bits at position n in inputs x, y, z are 1: Bit n in result is 1. Otherwise 0.
+	 * Maj (for "Majority"). If min. 2 of 3 bits at position n in inputs x, y, z are 1: Bit n in result is 1. Otherwise 0.
+	 * 
 	 * x: 1101 1101
 	 * y: 1011 0011
 	 * z: 1101 0011
@@ -93,7 +94,7 @@ public class Sha256 {
 	 * ^ 1001 0011
 	 * = 1101 0011 
 	 */	
-	public int Maj(int x, int y, int z) {
+	private int Maj(int x, int y, int z) {
 		return (x & y) ^ (x & z ) ^ (y & z );
 	}	
 
