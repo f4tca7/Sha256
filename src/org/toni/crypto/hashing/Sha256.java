@@ -36,6 +36,7 @@ public class Sha256 {
 	/** 
 	 * Ch (for "Choose"). If bit n in x == 1: bit n in result is the same as bit n of input y. else, take bit n of input z
 	 *  
+	 *  
 	 * x: 1111 0000
 	 * y: 0000 0000
 	 * z: 1111 1111
@@ -316,8 +317,10 @@ public class Sha256 {
     		hashValues[7] = h + hashValues[7];
     	}    	
     	
-        byte[] digest = new byte[32]; 
-        // Concatenate the hash values to one 256-bit output byte[]
+    	
+    	// Finalize the hash value
+    	// Concatenate the hash values to one 256-bit output byte[]
+        byte[] digest = new byte[32];         
         for (int i = 0; i < 8; i++) {
             System.arraycopy(intToBytes(hashValues[i]), 0, digest, 4 * i, 4);
         }    	
